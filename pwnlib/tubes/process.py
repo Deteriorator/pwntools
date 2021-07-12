@@ -29,6 +29,8 @@ from pwnlib.tubes.tube import tube
 from pwnlib.util.hashes import sha256file
 from pwnlib.util.misc import parse_ldd_output
 from pwnlib.util.misc import which
+from pwnlib.util.misc import normalize_argv_env
+from pwnlib.util.packing import _need_bytes
 
 log = getLogger(__name__)
 
@@ -201,6 +203,11 @@ class process(tube):
 
         >>> binary = ELF.from_assembly('nop', arch='mips')
         >>> p = process(binary.path)
+        >>> binary_dir, binary_name = os.path.split(binary.path)
+        >>> p = process('./{}'.format(binary_name), cwd=binary_dir)
+        >>> p = process(binary.path, cwd=binary_dir)
+        >>> p = process('./{}'.format(binary_name), cwd=os.path.relpath(binary_dir))
+        >>> p = process(binary.path, cwd=os.path.relpath(binary_dir))
     """
 
     STDOUT = STDOUT
@@ -505,34 +512,14 @@ class process(tube):
         Mostly to make Python happy, but also to prevent common pitfalls.
         """
 
+        orig_cwd = cwd
         cwd = cwd or os.path.curdir
 
-        #
-        # Validate argv
-        #
-        # - Must be a list/tuple of strings
-        # - Each string must not contain '\x00'
-        #
-        if isinstance(argv, (six.text_type, six.binary_type)):
-            argv = [argv]
-
-        if not isinstance(argv, (list, tuple)):
-            self.error('argv must be a list or tuple: %r' % argv)
-
-        if not all(isinstance(arg, (six.text_type, six.binary_type)) for arg in argv):
-            self.error("argv must be strings or bytes: %r" % argv)
-
-        # Create a duplicate so we can modify it
-        argv = list(argv or [])
-
-        for i, oarg in enumerate(argv):
-            if isinstance(oarg, six.text_type):
-                arg = oarg.encode('utf-8')
-            else:
-                arg = oarg
-            if b'\x00' in arg[:-1]:
-                self.error('Inappropriate nulls in argv[%i]: %r' % (i, oarg))
-            argv[i] = arg.rstrip(b'\x00')
+        argv, env = normalize_argv_env(argv, env, self, 4)
+        if env:
+            env = {bytes(k): bytes(v) for k, v in env}
+        if argv:
+            argv = list(map(bytes, argv))
 
         #
         # Validate executable
@@ -548,9 +535,11 @@ class process(tube):
         if not isinstance(executable, str):
             executable = executable.decode('utf-8')
 
-        env = os.environ if env is None else env
-
-        path = env.get('PATH')
+        path = env and env.get(b'PATH')
+        if path:
+            path = path.decode()
+        else:
+            path = os.environ.get('PATH')
         # Do not change absolute paths to binaries
         if executable.startswith(os.path.sep):
             pass
@@ -569,6 +558,12 @@ class process(tube):
             executable = os.path.join(cwd, executable)
             self.warn_once("Could not find executable %r in $PATH, using %r instead" % (tmp, executable))
 
+        # There is a path component and user specified a working directory,
+        # it must be relative to that directory. For example, 'bar/baz' with
+        # cwd='foo' or './baz' with cwd='foo/bar'
+        elif orig_cwd:
+            executable = os.path.join(orig_cwd, executable)
+
         if not os.path.exists(executable):
             self.error("%r does not exist"  % executable)
         if not os.path.isfile(executable):
@@ -576,31 +571,7 @@ class process(tube):
         if not os.access(executable, os.X_OK):
             self.error("%r is not marked as executable (+x)" % executable)
 
-        #
-        # Validate environment
-        #
-        # - Must be a dictionary of {string:string}
-        # - No strings may contain '\x00'
-        #
-
-        # Create a duplicate so we can modify it safely
-        env2 = {}
-        for k,v in env.items():
-            if not isinstance(k, (bytes, six.text_type)):
-                self.error('Environment keys must be strings: %r' % k)
-            if not isinstance(k, (bytes, six.text_type)):
-                self.error('Environment values must be strings: %r=%r' % (k,v))
-            if isinstance(k, six.text_type):
-                k = k.encode('utf-8')
-            if isinstance(v, six.text_type):
-                v = v.encode('utf-8', 'surrogateescape')
-            if b'\x00' in k[:-1]:
-                self.error('Inappropriate nulls in env key: %r' % (k))
-            if b'\x00' in v[:-1]:
-                self.error('Inappropriate nulls in env value: %r=%r' % (k, v))
-            env2[k.rstrip(b'\x00')] = v.rstrip(b'\x00')
-
-        return executable, argv, env2
+        return executable, argv, env
 
     def _handles(self, stdin, stdout, stderr):
         master = slave = None
@@ -971,7 +942,7 @@ class process(tube):
 
         Example:
 
-            >>> e = ELF('/bin/bash-static')
+            >>> e = ELF(which('bash-static'))
             >>> p = process(e.path)
 
             In order to make sure there's not a race condition against
@@ -993,6 +964,52 @@ class process(tube):
         with open('/proc/%i/mem' % self.pid, 'rb') as mem:
             mem.seek(address)
             return mem.read(count) or None
+
+    readmem = leak
+
+    def writemem(self, address, data):
+        r"""Writes memory within the process at the specified address.
+
+        Arguments:
+            address(int): Address to write memory
+            data(bytes): Data to write to the address
+
+        Example:
+        
+            Let's write data to  the beginning of the mapped memory of the  ELF.
+
+            >>> context.clear(arch='i386')
+            >>> address = 0x100000
+            >>> data = cyclic(32)
+            >>> assembly = shellcraft.nop() * len(data)
+
+            Wait for one byte of input, then write the data to stdout
+
+            >>> assembly += shellcraft.write(1, address, 1)
+            >>> assembly += shellcraft.read(0, 'esp', 1)
+            >>> assembly += shellcraft.write(1, address, 32)
+            >>> assembly += shellcraft.exit()
+            >>> asm(assembly)[32:]
+            b'j\x01[\xb9\xff\xff\xef\xff\xf7\xd1\x89\xdaj\x04X\xcd\x801\xdb\x89\xe1j\x01Zj\x03X\xcd\x80j\x01[\xb9\xff\xff\xef\xff\xf7\xd1j Zj\x04X\xcd\x801\xdbj\x01X\xcd\x80'
+
+            Assemble the binary and test it
+
+            >>> elf = ELF.from_assembly(assembly, vma=address)
+            >>> io = elf.process()
+            >>> _ = io.recvuntil(b'\x90')
+            >>> _ = io.writemem(address, data)
+            >>> io.send(b'X')
+            >>> io.recvall()
+            b'aaaabaaacaaadaaaeaaafaaagaaahaaa'
+        """
+
+        if 'qemu-' in os.path.realpath('/proc/%i/exe' % self.pid):
+            self.error("Cannot use leaker on binaries under QEMU.")
+
+        with open('/proc/%i/mem' % self.pid, 'wb') as mem:
+            mem.seek(address)
+            return mem.write(data)
+
 
     @property
     def stdin(self):

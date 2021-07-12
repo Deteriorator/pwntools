@@ -9,9 +9,12 @@ The table below shows which release corresponds to each branch, and what date th
 
 | Version          | Branch   | Release Date           |
 | ---------------- | -------- | ---------------------- |
-| [4.6.0](#460)    | `dev`    | May 29, 2020 (planned)
-| [4.5.0](#450)    | `beta`   | Apr 29, 2020 (planned)
-| [4.4.0](#440)    | `stable` | Mar 29, 2020
+| [4.8.0](#480)    | `dev`    |
+| [4.7.0](#470)    | `beta`   |
+| [4.6.0](#460)    | `stable` | Jul 12, 2021
+| [4.5.1](#451)    |          | May 30, 2021
+| [4.5.0](#450)    |          | Apr 30, 2021
+| [4.4.0](#440)    |          | Mar 29, 2021
 | [4.3.1](#431)    |          | Nov 29, 2020
 | [4.3.0](#430)    |          | Oct 20, 2020
 | [4.2.0](#420)    |          | Jul 3, 2020
@@ -58,23 +61,65 @@ The table below shows which release corresponds to each branch, and what date th
 | [3.0.0](#300)    |          | Aug 20, 2016
 | [2.2.0](#220)    |          | Jan 5, 2015
 
-## 4.6.0 (`dev`)
+## 4.8.0 (`dev`)
+
+
+
+## 4.7.0 (`beta`)
+
+- [#1733][1733] Update libc headers -> more syscalls available!
+- [#1876][1876] add `self.message` and change `sys.exc_type` to `sys.exec_info()` in PwnlibException
+- [#1877][1877] encoders error message handles when `avoid` is bytes in python3
+- [#1891][1891] Keep ROP gadgets when setting registers via setattr/call
+- [#1892][1892] Silence SIGPIPE error for "pwn phd"
+- [#1893][1893] Fix bytes warning in "pwn cyclic"
+- [#1897][1897] Add basic support for RISC-V
+- [#1903][1903] Add zsh completion script
+- [#1904][1904] Add bash completion script
+- [#1906][1906] Defer import of several modules to save on startup time
+- [#1921][1921] Add basic support for the bare-metal ARM specific toolchain
+
+[1733]: https://github.com/Gallopsled/pwntools/pull/1733
+[1876]: https://github.com/Gallopsled/pwntools/pull/1876
+[1877]: https://github.com/Gallopsled/pwntools/pull/1877
+[1891]: https://github.com/Gallopsled/pwntools/pull/1891
+[1892]: https://github.com/Gallopsled/pwntools/pull/1892
+[1893]: https://github.com/Gallopsled/pwntools/pull/1893
+[1897]: https://github.com/Gallopsled/pwntools/pull/1897
+[1903]: https://github.com/Gallopsled/pwntools/pull/1903
+[1904]: https://github.com/Gallopsled/pwntools/pull/1904
+[1906]: https://github.com/Gallopsled/pwntools/pull/1906
+[1921]: https://github.com/Gallopsled/pwntools/pull/1921
+
+## 4.6.0 (`stable`)
 
 - [#1429][1429] Add a mechanism for ret2csu (originally #1138)
+- [#1566][1566] Add `ignore_config` argument to `pwnlib.tubes.ssh` and improve `allow_agent` implementation
+- [#1652][1652] Add `process.readmem` and `process.writemem`
 - [#1739][1739] Add/fix shellcraft.linux.kill() / shellcraft.linux.killparent()
 - [#1746][1746] Prefer Python3 over Python2 for spawning remote processes over SSH
+- [#1751][1751] Fix process() with executable relative to cwd
 - [#1753][1753] major change: less unconditional imports in pwnlib
 - [#1776][1776] mips: do not use $t0 temporary variable in dupio
 - [#1846][1846] support launching GDB in more different terminals
 
 [1429]: https://github.com/Gallopsled/pwntools/pull/1429
+[1566]: https://github.com/Gallopsled/pwntools/pull/1566
+[1652]: https://github.com/Gallopsled/pwntools/pull/1652
 [1739]: https://github.com/Gallopsled/pwntools/pull/1739
 [1746]: https://github.com/Gallopsled/pwntools/pull/1746
+[1751]: https://github.com/Gallopsled/pwntools/pull/1751
 [1753]: https://github.com/Gallopsled/pwntools/pull/1753
 [1776]: https://github.com/Gallopsled/pwntools/pull/1776
 [1846]: https://github.com/Gallopsled/pwntools/pull/1846
 
-## 4.5.0 (`beta`)
+## 4.5.1
+
+- [#1902][1902] Always specify -F and -P for tmux in `run_in_new_terminal`
+
+[1902]: https://github.com/Gallopsled/pwntools/pull/1902
+
+## 4.5.0
 
 - [#1261][1261] Misc `run_in_new_terminal` improvements (notably gdb terminated by default)
 - [#1695][1695] Allow using GDB Python API
@@ -92,6 +137,7 @@ The table below shows which release corresponds to each branch, and what date th
 - [#1839][1839] run_in_new_terminal now creates a runner script if given a list or tuple
 - [#1833][1833] Add pwnlib.filesystem module
 - [#1852][1852] Fix `atexit` on Python 3
+- [#1883][1883] ROP gadget verifier accounts for 2 character registers
 
 [1261]: https://github.com/Gallopsled/pwntools/pull/1261
 [1695]: https://github.com/Gallopsled/pwntools/pull/1695
@@ -108,8 +154,9 @@ The table below shows which release corresponds to each branch, and what date th
 [1839]: https://github.com/Gallopsled/pwntools/pull/1839
 [1833]:  https://github.com/Gallopsled/pwntools/pull/1833
 [1852]: https://github.com/Gallopsled/pwntools/pull/1852
+[1883]: https://github.com/Gallopsled/pwntools/pull/1883
 
-## 4.4.0 (`stable`)
+## 4.4.0
 
 - [#1541][1541] Use `context.newline` for tubes by default
 - [#1602][1602] Fix bytes handling in ssh tubes
